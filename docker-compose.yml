@@ -1,0 +1,35 @@
+version: '3.8'
+
+services: 
+  # main pipeline service 
+  pipeline: 
+    # build the image using Dockerfile in current directory
+    build: .
+
+    # load env variables from .env file
+    env_file: 
+      - .env
+
+      # mount local folders into container 
+      # format: local_path:container_path
+
+    volumes: 
+      - ./src:/app/src
+      - ./data:/app/data
+
+    # keep the continer running 
+    command: tail -f /dev/null
+    
+  # # jupyter notebook for exploration 
+  # notebook: 
+  #   build: .
+  #   env_file: 
+  #     - .env
+  #   volumes: 
+  #   - ./src:/app/src
+  #   - ./data:/app/data
+  #   - ./notebooks:/app/notebooks
+  #   ports:
+  #   - "8888:8888"
+  #   command: jupyter notebook --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/app/notebooks
+
