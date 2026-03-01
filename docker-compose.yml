@@ -1,4 +1,4 @@
-version: '3.8'
+# Run command first to build: docker compose up -d --build
 
 services: 
   # main pipeline service 
@@ -17,19 +17,22 @@ services:
       - ./src:/app/src
       - ./data:/app/data
 
+    # working directory to src
+    working_dir: /app/src
+
     # keep the continer running 
     command: tail -f /dev/null
     
-  # # jupyter notebook for exploration 
-  # notebook: 
-  #   build: .
-  #   env_file: 
-  #     - .env
-  #   volumes: 
-  #   - ./src:/app/src
-  #   - ./data:/app/data
-  #   - ./notebooks:/app/notebooks
-  #   ports:
-  #   - "8888:8888"
-  #   command: jupyter notebook --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/app/notebooks
+  # jupyter notebook for exploration 
+  notebook: 
+    build: .
+    env_file: 
+      - .env
+    volumes: 
+    - ./src:/app/src
+    - ./data:/app/data
+    - ./notebooks:/app/notebooks
+    ports:
+    - "8888:8888"
+    command: jupyter notebook --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/app/notebooks
 

@@ -4,3 +4,4 @@ python-dotenv==1.0.0
 pandas==2.1.4
 pyarrow==14.0.1
 tqdm==4.66.1
+jupyter==1.0.0
