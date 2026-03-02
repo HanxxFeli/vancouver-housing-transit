@@ -16,6 +16,7 @@ from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StringType, StructType, StructField
 from transformation.spark_session import create_spark_session
+from pyspark.sql.window import Window
 
 logger = logging.getLogger(__name__)
 
@@ -96,105 +97,85 @@ def load_skytrain_stations(spark: SparkSession) -> DataFrame:
 
 def calculate_nearest_station(properties: DataFrame, stations: DataFrame) -> DataFrame:
     """
-    For each property, find the nearest SkyTrain station and the distance to it
-
-    Cross Join Approach: Produces every combination of rows from 2 tables. 
-    If 100,000 properties and 50 stations, cross join = 5,000,000
-
-    for each property, calculate distance to all stations, then only keep the closest one
-    (brute force spacial join)
+    Joins at neighbourhood level instead of property level.
+    
+    Since properties only have neighbourhood codes (not individual coordinates),
+    joining at the neighbourhood centroid level is both correct and efficient.
+    22 neighbourhoods × 50 stations = 1,100 combinations vs 5 million.
     """
-
-    logger.info("Performing spatial join (cross join + distance calculation)...")
-    logger.info("This may take a few minutes for large datasets...")
-
-    # Check if lat/long exists in dataset
-    # Vancouver property tax data may have coors or may need to geocode (handle both)
-    if "latitude" not in properties.columns or "longitude" not in properties.columns:
-        logger.warning("Property data doesn't have lat/lon columns.")
-        logger.info("You'll need to geocode addresses or find a version of the dataset with coordinates.")
-        logger.info("For now, creating a simplified version with neighbourhood centroids...")
-
-        # approximate center points for vancouver neighbourhoods (centroid)
-        neighbourhood_coords = {
-            "DOWNTOWN": (49.2827, -123.1207),
-            "WEST END": (49.2888, -123.1394),
-            "KITSILANO": (49.2672, -123.1638),
-            "MOUNT PLEASANT": (49.2631, -123.1009),
-            "FAIRVIEW": (49.2651, -123.1280),
-            "CAMBIE": (49.2453, -123.1167),
-            "HASTINGS-SUNRISE": (49.2791, -123.0490),
-            "RENFREW-COLLINGWOOD": (49.2479, -123.0454),
-            "KENSINGTON-CEDAR COTTAGE": (49.2454, -123.0793),
-            "RILEY PARK": (49.2500, -123.1010),
-            "GRANDVIEW-WOODLAND": (49.2739, -123.0705),
-            "DUNBAR-SOUTHLANDS": (49.2361, -123.1891),
-            "KERRISDALE": (49.2322, -123.1571),
-            "MARPOLE": (49.2093, -123.1237),
-            "SUNSET": (49.2215, -123.0856),
-            "VICTORIA-FRASERVIEW": (49.2174, -123.0611),
-            "KILLARNEY": (49.2200, -123.0299),
-            "SOUTH CAMBIE": (49.2408, -123.1175),
-            "OAKRIDGE": (49.2257, -123.1238),
-            "SHAUGHNESSY": (49.2479, -123.1419),
-            "ARBUTUS RIDGE": (49.2467, -123.1622),
-            "WEST POINT GREY": (49.2668, -123.2010),
-        }
-
-        # Add approximate coordinates based on neighbourhood
-        # Create pyspark map using F.create_map from key-value pairs
-        coords_map = {}
-        for neighbourhood, (lat, lon) in neighbourhood_coords.items():
-            coords_map[neighbourhood] = (lat, lon)
-
-        # User defined function handling 
-        def get_neighbourhood_lat(neighbourhood_code):
-            return coords_map.get(str(neighbourhood_code), (49.2827,))[0] if neighbourhood_code else None
-        
-        def get_neighbourhood_lon(neighbourhood_code):
-            return coords_map.get(str(neighbourhood_code), (None, -123.1207,))[1] if neighbourhood_code else None
-        
-        get_lat_udf = F.udf(get_neighbourhood_lat, DoubleType())
-        get_lon_udf = F.udf(get_neighbourhood_lon, DoubleType())
-
-        properties = properties.withColumn("latitude", get_lat_udf(F.col("neighbourhood_code")))
-        properties = properties.withColumn("longitude", get_lon_udf(F.col("neighbourhood_code")))
-
-
-    #---Cross Join---
-    cross = properties.crossJoin(stations)
-
-    # logger.info("Cross join produced %s combinations", f"{cross.count():,}")
-
-    #---Calculate Distance for each Combo---"
+    
+    # Build neighbourhood centroids as a small DataFrame
+    neighbourhood_coords: dict[str, tuple[float, float]] = {
+        "DOWNTOWN": (49.2827, -123.1207),
+        "WEST END": (49.2888, -123.1394),
+        "KITSILANO": (49.2672, -123.1638),
+        "MOUNT PLEASANT": (49.2631, -123.1009),
+        "FAIRVIEW": (49.2651, -123.1280),
+        "CAMBIE": (49.2453, -123.1167),
+        "HASTINGS-SUNRISE": (49.2791, -123.0490),
+        "RENFREW-COLLINGWOOD": (49.2479, -123.0454),
+        "KENSINGTON-CEDAR COTTAGE": (49.2454, -123.0793),
+        "RILEY PARK": (49.2500, -123.1010),
+        "GRANDVIEW-WOODLAND": (49.2739, -123.0705),
+        "DUNBAR-SOUTHLANDS": (49.2361, -123.1891),
+        "KERRISDALE": (49.2322, -123.1571),
+        "MARPOLE": (49.2093, -123.1237),
+        "SUNSET": (49.2215, -123.0856),
+        "VICTORIA-FRASERVIEW": (49.2174, -123.0611),
+        "KILLARNEY": (49.2200, -123.0299),
+        "SOUTH CAMBIE": (49.2408, -123.1175),
+        "OAKRIDGE": (49.2257, -123.1238),
+        "SHAUGHNESSY": (49.2479, -123.1419),
+        "ARBUTUS RIDGE": (49.2467, -123.1622),
+        "WEST POINT GREY": (49.2668, -123.2010),
+    }
+    
+    # Convert to a small Spark DataFrame
+    # This is tiny — 22 rows, no memory issues
+    from pyspark.sql.types import StructType, StructField, StringType
+    
+    schema = StructType([
+        StructField("neighbourhood_code", StringType(), True),
+        StructField("neighbourhood_lat", DoubleType(), True),
+        StructField("neighbourhood_lon", DoubleType(), True),
+    ])
+    
+    neighbourhood_df: DataFrame = properties.sparkSession.createDataFrame(
+        [(k, v[0], v[1]) for k, v in neighbourhood_coords.items()],
+        schema=schema,
+    )
+    
+    # Cross join neighbourhoods × stations (22 × 50 = 1,100 rows)
+    cross: DataFrame = neighbourhood_df.crossJoin(stations)
+    
+    # Calculate distance for each neighbourhood-station pair
     cross = cross.withColumn(
         "distance_km",
         haversine_udf(
-            F.col("latitude"),
-            F.col("longitude"),
+            F.col("neighbourhood_lat"),
+            F.col("neighbourhood_lon"),
             F.col("station_lat"),
-            F.col("station_long")
-        )
+            F.col("station_long"),
+        ),
     )
 
-    # Write to disk to free memory
-    cross = cross.checkpoint()
-
-    # Keep only the nearest station per property
-    from pyspark.sql.window import Window
-
-    # For each property_id, order by ascending distance
-    window =  Window.partitionBy("property_id").orderBy(F.col("distance_km").asc())
-
-    # assign rank on each window partition
+    # Find nearest station per neighbourhood
+    window = Window.partitionBy("neighbourhood_code").orderBy(F.col("distance_km").asc())
     cross = cross.withColumn("distance_rank", F.rank().over(window))
-
-    # Keep only rank 1 (nearest station)
-    nearest = cross.filter(F.col("distance_rank") == 1).drop("distance_rank")
-
-    # logger.info("After keeping the nearest station: %s rows", f"{nearest.count():,}")
-
-    return nearest
+    nearest_per_neighbourhood: DataFrame = cross.filter(
+        F.col("distance_rank") == 1
+    ).drop("distance_rank", "neighbourhood_lat", "neighbourhood_lon")
+    
+    # Join result back onto properties using neighbourhood_code
+    # This is a simple join on a key — fast and memory-efficient
+    enriched: DataFrame = properties.join(
+        nearest_per_neighbourhood,
+        on="neighbourhood_code",
+        how="left",
+    )
+    
+    logger.info("Enriched properties with nearest station per neighbourhood")
+    return enriched
 
 def add_proximity_buckets(df: DataFrame) -> DataFrame:
     """
@@ -222,7 +203,7 @@ def write_silver(df: DataFrame) -> None:
 
     OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Writin enriched silver data to: %s", OUTPUT_PATH)
+    logger.info("Writing enriched silver data to: %s", OUTPUT_PATH)
 
     (
         df
@@ -235,24 +216,26 @@ def write_silver(df: DataFrame) -> None:
 
     logger.info("Transit proximity data written to silver layer")
 
-def main():
+def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    )
+
     spark = create_spark_session("TransitProximityJoin")
 
     logger.info("=== Transit Proximity Transformation ===")
 
     # Load data
-    properties = spark.read.parquet(str(SILVER_PROPERTIES_PATH))
-    stations = load_skytrain_stations(spark)
+    properties: DataFrame = spark.read.parquet(str(SILVER_PROPERTIES_PATH))
+    stations: DataFrame = load_skytrain_stations(spark)
 
     # show files that will be used
     logger.info("Properties loaded: %s", f"{properties.count():,}")
     logger.info("Stations loaded: %s", f"{stations.count():,}")
 
-    # Checkpoint for writing results to disk and preventing JVM from holding everything
-    spark.sparkContext.setCheckpointDir("/app/data/checkpoints")
-
     # Run spatial join
-    enriched = calculate_nearest_station(properties, stations)
+    enriched: DataFrame = calculate_nearest_station(properties, stations)
     enriched = add_proximity_buckets(enriched)
 
     # preview results 

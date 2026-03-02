@@ -36,11 +36,7 @@ def create_spark_session(app_name: str = "VancouverHousingTransit") -> SparkSess
 
         # Number of partitions after shuffle
         # lower = fewer, larger files. 8 for local dev
-        .config("spark.sql.shuffle.partitions", "4")
-        .config("spark.driver.memory", "4g")
-        .config("spark.executor.memory", "3g") 
-        .config("spark.driver.maxResultSize", "2g")
-        .config("spark.memory.fraction", "0.8")
+        .config("spark.sql.shuffle.partitions", "8")
 
         .getOrCreate()
     )
