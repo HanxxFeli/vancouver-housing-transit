@@ -56,8 +56,11 @@ services:
 
   # ── API container — uncomment when reaching step 4 ──────────────────────
   api:
-    build: .
-    env_file: [.env]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file: 
+      - .env
     volumes:
       - ./src:/app/src
       - ./data:/app/data
