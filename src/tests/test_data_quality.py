@@ -69,5 +69,7 @@ class TestDataQuality:
 
         if "distance_km" in df.columns:
             distances = df["distance_km"].dropna()  # drop NAN before checking
-            assert distances.max() < 100, f"Unreasonably large distance found: {distances.max()}km"
+            assert (
+                distances.max() < 100
+            ), f"Unreasonably large distance found: {distances.max()}km"
             assert distances.min() >= 0, f"Negative distance found: {distances.min()}km"
