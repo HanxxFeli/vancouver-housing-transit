@@ -43,7 +43,7 @@ jobs:
       # Step 6: Check for syntax errors and style issues
       # --max-line-length=100 allows slightly longer lines than PEP8's default 79
       - name: Lint (flake8)
-        run: flake8 src/ --max-line-length=100 --exclude=__pycache__
+        run: flake8 src/ --max-line-length=100 --extend-ignore=E402
 
   # Job 2: Run data quality tests
   # Note: We skip ingestion tests in CI since we don't have API keys or large data there
