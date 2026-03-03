@@ -1,38 +1,95 @@
-# Run command first to build: docker compose up -d --build
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment:
+    # Airflow 3.x uses LocalExecutor by default — no Celery needed for local dev
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
 
-services: 
-  # main pipeline service 
-  pipeline: 
-    # build the image using Dockerfile in current directory
+    # Database connection — still Postgres
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+
+    # Airflow 3.x: DAGs are paused by default — enable them in the UI
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+
+    # Don't load the example DAGs that come bundled with Airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+
+    # Makes src/ folder importable inside the Airflow container
+    PYTHONPATH: /opt/airflow/pipeline_src
+
+    # Airflow 3.x auth
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+
+  env_file:
+    - .env
+  volumes:
+    - ./dags:/opt/airflow/dags              # DAG files
+    - ./logs/airflow:/opt/airflow/logs      # Airflow run logs
+    - ./src:/opt/airflow/pipeline_src       # pipeline code (importable)
+    - ./data:/app/data                      # Shared data directory — same path as pipeline container
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ── Pipeline container — used for manual runs and verification ───────────
+  pipeline:
     build: .
-
-    # load env variables from .env file
-    env_file: 
-      - .env
-
-      # mount local folders into container 
-      # format: local_path:container_path
-
-    volumes: 
+    env_file: [.env]
+    volumes:
       - ./src:/app/src
       - ./data:/app/data
-
-    # working directory to src
     working_dir: /app/src
-
-    # keep the continer running 
     command: tail -f /dev/null
-    
-  # jupyter notebook for exploration 
-  notebook: 
-    build: .
-    env_file: 
-      - .env
-    volumes: 
-    - ./src:/app/src
-    - ./data:/app/data
-    - ./notebooks:/app/notebooks
-    ports:
-    - "8888:8888"
-    command: jupyter notebook --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/app/notebooks
 
+  # ── Test container — runs pytest on startup ──────────────────────────────
+  test:
+    build: .
+    env_file: [.env]
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    working_dir: /app/src
+    command: python -m pytest tests/ -v
+
+  # ── API container — uncomment when reaching step 4 ──────────────────────
+  api:
+    build: .
+    env_file: [.env]
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    working_dir: /app/src
+    environment:
+      PYTHONPATH: /app/src
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Airflow services ─────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+
+  # Standalone mode runs scheduler, webserver, and triggerer in one container
+  # Password: docker compose exec airflow-standalone cat /opt/airflow/simple_auth_manager_passwords.json.generated
+  airflow-standalone:
+    <<: *airflow-common
+    command: standalone
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-db-volume:
