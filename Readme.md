@@ -43,7 +43,7 @@ Pulls Vancouver property tax assessment data and TransLink's GTFS transit feed, 
 
 ![Airflow DAG](docs/airflow_dag.png)
 
-**Note on Airflow's role:** Airflow acts purely as a scheduler and monitor. It triggers `pipeline.py` via BashOperator and watches the result. All PySpark logic lives in `pipeline.py` and the transformation modules. This separation was intentional — running PySpark inside Airflow tasks directly caused JVM memory conflicts. Keeping them separate solved the memory problem and keeps each piece focused on what it does best.
+**Note on Airflow's role:** Airflow acts purely as a scheduler and monitor. It triggers `pipeline.py` via BashOperator and watches the result. All PySpark logic lives in `pipeline.py` and the transformation modules. This separation was intentional — running PySpark inside Airflow tasks directly caused JVM memory conflicts crashing and was not possible due to the severe lack of memory. Keeping them separate solved the memory problem and keeps each piece focused on what it does best.
 
 ## Tech Stack
 
@@ -177,7 +177,11 @@ vancouver-housing-transit/
 │   └── pipeline.py                         # Master pipeline orchestrator
 ├── Dockerfile
 ├── Dockerfile.airflow
+├── Dockerfile.api
+├── pyproject.toml
 ├── Makefile
 ├── docker-compose.yml
 └── requirements.txt
+└── requirements-api.txt
+└── requirements-dev.txt
 ```
