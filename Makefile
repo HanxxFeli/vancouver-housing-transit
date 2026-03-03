@@ -21,8 +21,8 @@ test:
 
 # Lint code locally (requires flake8, black, isort installed)
 lint:
-	black src/
 	isort src/
+	black src/
 	flake8 src/ --max-line-length=100 --extend-ignore=E402
 
 # Remove generated data (useful to test a clean run)
