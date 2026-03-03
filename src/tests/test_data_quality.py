@@ -4,11 +4,10 @@ test_data_quality.py
 Data quality tests — assertions that our pipeline output meets minimum standards.
 """
 
-import pytest
 from pathlib import Path
 
 import pandas as pd
-
+import pytest
 
 GOLD_DIR = Path(__file__).parent.parent.parent / "data" / "gold"
 SILVER_DIR = Path(__file__).parent.parent.parent / "data" / "silver"
@@ -69,11 +68,6 @@ class TestDataQuality:
         df = pd.read_parquet(parquet_files[0])
 
         if "distance_km" in df.columns:
-            valid_distances = df["distance_km"].dropna()  # drop NAN before checking
-            max_distance = df["distance_km"].max()
-            assert (
-                max_distance < 100
-            ), f"Unreasonably large distance found: {max_distance}km"
-
-            min_distance = df["distance_km"].min()
-            assert min_distance >= 0, f"Negative distance found: {min_distance}km"
+            distances = df["distance_km"].dropna()  # drop NAN before checking
+            assert distances.max() < 100, f"Unreasonably large distance found: {distances.max()}km"
+            assert distances.min() >= 0, f"Negative distance found: {distances.min()}km"

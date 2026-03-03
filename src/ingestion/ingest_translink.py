@@ -1,12 +1,11 @@
 """
 ingest_translink.py
 
-Download Translink GTFS data to extract stop locations for bronze layer saving 
+Download Translink GTFS data to extract stop locations for bronze layer saving
 """
 
 import io
 import logging
-import os
 import zipfile
 from pathlib import Path
 

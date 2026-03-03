@@ -4,20 +4,21 @@ transform_transit_proximity.py
 Purpose: For every Vancouver property, find the nearest SkyTrain station
 and calculate the distance to it.
 
-Running: 
+Running:
 docker compose exec pipeline python -m transformation.transform_transit_proximity
 """
 
-import math
-from pathlib import Path
 import logging
+import math
 import os
+from pathlib import Path
 
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, StringType, StructType, StructField
-from transformation.spark_session import create_spark_session
+from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 from pyspark.sql.window import Window
+
+from transformation.spark_session import create_spark_session
 
 logger = logging.getLogger(__name__)
 

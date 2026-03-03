@@ -1,4 +1,4 @@
-""" 
+"""
 main.py
 
 Purpose: FastAPI application entry point. File that uvicorn runs to start
@@ -17,10 +17,8 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import sys
-
-from api.routers import neighbourhoods
 from api.models import PipelineHealth
+from api.routers import neighbourhoods
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,11 @@
 """
-models.py 
+models.py
 
-Define the shape of data the API will return 
+Define the shape of data the API will return
 
-Pydantic models that will be used to define the expected structure of data 
-Fast API will use them to: 
-1. Validate data matches the expected format 
+Pydantic models that will be used to define the expected structure of data
+Fast API will use them to:
+1. Validate data matches the expected format
 2. Auto-generate the /docs Swagger documentation
 3. Serialize python objects to JSON
 """

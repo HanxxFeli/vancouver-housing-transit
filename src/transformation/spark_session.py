@@ -6,6 +6,7 @@ Read data, run transformations and write output script.
 """
 
 import logging
+
 from pyspark.sql import SparkSession
 
 # logger name

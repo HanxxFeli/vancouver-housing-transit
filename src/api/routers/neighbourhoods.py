@@ -1,4 +1,4 @@
-""" 
+"""
 routers/neighbourhoods.py
 
 Purpose: API endpoints related to the Vancouver neighbourhoods
@@ -6,7 +6,7 @@ Purpose: API endpoints related to the Vancouver neighbourhoods
 Router is registered in main.py via app.include_router(neighbourhoods.router)
 All endpoints present in the router are automatically prefixed with /api/neighbourhoods
 
-Endpoints: 
+Endpoints:
     GET /api/neighbourhoods                         -> all neighbourhoods
     GET /api/neighbourhoods/{code}                  -> one neighbourhood by numeric code
     GET /api/neighbourhoods/{code}/transit-analysis -> transit proximity breakdown
@@ -19,7 +19,6 @@ from pathlib import Path
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
-import sys
 from api.models import NeighbourhoodOverview, TransitProximityDetail
 
 logger = logging.getLogger(__name__)

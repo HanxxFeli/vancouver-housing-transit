@@ -28,7 +28,8 @@ from ingestion.ingest_property_tax import ingest_property_tax
 from ingestion.ingest_translink import ingest_translink_stops
 from transformation.transform_gold import main as transform_gold
 from transformation.transform_properties import main as transform_properties
-from transformation.transform_transit_proximity import main as transform_proximity
+from transformation.transform_transit_proximity import \
+    main as transform_proximity
 
 
 def run_stage(

@@ -23,7 +23,7 @@ test:
 lint:
 	black src/
 	isort src/
-	flake8 src/ --max-line-length=100
+	flake8 src/ --max-line-length=100 --extend-ignore=E402
 
 # Remove generated data (useful to test a clean run)
 clean-data:

@@ -1,8 +1,8 @@
 """
-transform gold.py 
+transform gold.py
 
 PURPOSE: Aggregate silver data into neighbourhood-level summaries
-that answers: "How does transit proximity affect property values in 
+that answers: "How does transit proximity affect property values in
 Vancouver neighbourhoods?"
 
 Gold Layer Rules:
@@ -11,15 +11,15 @@ Gold Layer Rules:
 - Optimized for reading - structured for the API
 """
 
-from itertools import chain
-from pathlib import Path
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import functions as F
-
-import sys
+import logging
 import os
 import shutil
-import logging
+import sys
+from itertools import chain
+from pathlib import Path
+
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
 sys.path.append(str(Path(__file__).parent.parent))
 from transformation.spark_session import create_spark_session

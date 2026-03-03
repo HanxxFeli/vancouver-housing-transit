@@ -1,16 +1,15 @@
 """
-Download Vancouver property tax data and save as a Parquet file 
+Download Vancouver property tax data and save as a Parquet file
 for bronze layer
 """
 
 import logging
-import os
 from pathlib import Path
-from tqdm import tqdm
 
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 # load env variables from .env file
 # allow TRANSLINK_API_KEY and ENVIRONMENT available as os.environ var

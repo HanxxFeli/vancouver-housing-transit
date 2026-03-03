@@ -4,14 +4,14 @@ transform_properties.py
 Purpose: Read raw property tax data from bronze layer
 clean it then write clean data to silver layer
 
-Rules: 
+Rules:
 - Fix data types (everything is a string from CSV)
 - remove or handle null/missing values
 - standardize column names (using snake_case)
 - filter rows
 - no aggregation (for gold layer work)
 
-Running: 
+Running:
 docker compose exec pipeline python -m transformation.transform_properties
 """
 
