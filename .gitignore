@@ -12,6 +12,7 @@ __pycache__/
 # Virtual environments
 venv/
 .venv/
+.venv-airflow
 
 # macOS system files
 .DS_Store
@@ -19,3 +20,7 @@ venv/
 # IDE files
 .idea/
 .vscode/
+
+# Logs
+logs/
+*.log

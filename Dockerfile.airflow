@@ -1,0 +1,30 @@
+# Base image: official Apache Airflow image
+# Pinned to 3.1.7 — the current stable release (released 2026-02-04)
+FROM apache/airflow:3.1.7
+
+# Switch to root to install system-level dependencies
+# (airflow user doesn't have sudo access)
+USER root
+
+# Install OpenJDK 17 — required by PySpark to run the JVM
+# --no-install-recommends keeps the image size smaller
+# apt-get clean + rm -rf removes cached package files after install
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openjdk-17-jdk && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Tell PySpark (and any other Java tools) where to find the JDK
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Switch back to the airflow user for pip installs
+# Installing as root can cause permission issues with Airflow
+USER airflow
+
+# Copy only the requirements file first
+# Docker caches this layer — if requirements.txt hasn't changed
+COPY requirements.txt .
+
+# Install Python dependencies
+# --no-cache-dir reduces image size by not storing the pip download cache
+RUN pip install --no-cache-dir -r requirements.txt

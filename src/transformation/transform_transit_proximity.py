@@ -11,6 +11,7 @@ docker compose exec pipeline python -m transformation.transform_transit_proximit
 import math
 from pathlib import Path
 import logging
+import os
 
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
@@ -21,9 +22,12 @@ from pyspark.sql.window import Window
 logger = logging.getLogger(__name__)
 
 #----CONFIG----
-SILVER_PROPERTIES_PATH = Path(__file__).parent.parent.parent / "data" / "silver" / "properties_cleaned"
-BRONZE_STOPS_PATH = Path(__file__).parent.parent.parent / "data" / "bronze" / "translink_stops" / "skytrain_stations_raw.parquet"
-OUTPUT_PATH = Path(__file__).parent.parent.parent / "data" / "silver" / "properties_with_transit"
+
+BASE_DATA_PATH = Path(os.environ.get("BASE_DATA_PATH", "/app/data"))
+# transform_transit_proximity.py
+SILVER_PROPERTIES_PATH = BASE_DATA_PATH / "silver" / "properties_cleaned"
+BRONZE_STOPS_PATH = BASE_DATA_PATH / "bronze" / "translink_stops" / "skytrain_stations_raw.parquet"
+OUTPUT_PATH = BASE_DATA_PATH / "silver" / "properties_with_transit"
 
 #----Haversine Distance----
 
@@ -103,36 +107,48 @@ def calculate_nearest_station(properties: DataFrame, stations: DataFrame) -> Dat
     joining at the neighbourhood centroid level is both correct and efficient.
     22 neighbourhoods × 50 stations = 1,100 combinations vs 5 million.
     """
+
+    # Cast neighbourhood_code to string so it matches the dictionary keys
+    properties = properties.withColumn(
+        "neighbourhood_code",
+        F.col("neighbourhood_code").cast(StringType())
+    )
     
     # Build neighbourhood centroids as a small DataFrame
     neighbourhood_coords: dict[str, tuple[float, float]] = {
-        "DOWNTOWN": (49.2827, -123.1207),
-        "WEST END": (49.2888, -123.1394),
-        "KITSILANO": (49.2672, -123.1638),
-        "MOUNT PLEASANT": (49.2631, -123.1009),
-        "FAIRVIEW": (49.2651, -123.1280),
-        "CAMBIE": (49.2453, -123.1167),
-        "HASTINGS-SUNRISE": (49.2791, -123.0490),
-        "RENFREW-COLLINGWOOD": (49.2479, -123.0454),
-        "KENSINGTON-CEDAR COTTAGE": (49.2454, -123.0793),
-        "RILEY PARK": (49.2500, -123.1010),
-        "GRANDVIEW-WOODLAND": (49.2739, -123.0705),
-        "DUNBAR-SOUTHLANDS": (49.2361, -123.1891),
-        "KERRISDALE": (49.2322, -123.1571),
-        "MARPOLE": (49.2093, -123.1237),
-        "SUNSET": (49.2215, -123.0856),
-        "VICTORIA-FRASERVIEW": (49.2174, -123.0611),
-        "KILLARNEY": (49.2200, -123.0299),
-        "SOUTH CAMBIE": (49.2408, -123.1175),
-        "OAKRIDGE": (49.2257, -123.1238),
-        "SHAUGHNESSY": (49.2479, -123.1419),
-        "ARBUTUS RIDGE": (49.2467, -123.1622),
-        "WEST POINT GREY": (49.2668, -123.2010),
+        "1":  (49.2668, -123.2010),  # WEST POINT GREY (Discovery St)
+        "2":  (49.2672, -123.1638),  # KITSILANO (7th Ave W)
+        "3":  (49.2467, -123.1622),  # ARBUTUS RIDGE (26th Ave W)
+        "4":  (49.2361, -123.1891),  # DUNBAR-SOUTHLANDS (McMullen Ave)
+        "5":  (49.2257, -123.1238),  # OAKRIDGE (41st Ave W)
+        "6":  (49.2093, -123.1237),  # MARPOLE (49th Ave W)
+        "7":  (49.2651, -123.1280),  # FAIRVIEW (16th Ave W)
+        "8":  (49.2479, -123.1419),  # SHAUGHNESSY (19th Ave W)
+        "9":  (49.2322, -123.1571),  # KERRISDALE (King Edward Ave W)
+        "10": (49.2215, -123.0856),  # SUNSET (48th Ave W)
+        "11": (49.2453, -123.1167),  # CAMBIE (Cambie St)
+        "12": (49.2093, -123.1010),  # VICTORIA-FRASERVIEW (Nunavut Lane)
+        "13": (49.2631, -123.1009),  # MOUNT PLEASANT (8th Ave E)
+        "14": (49.2739, -123.0705),  # GRANDVIEW-WOODLAND (Parker St)
+        "15": (49.2500, -123.1010),  # RILEY PARK (Ontario St)
+        "16": (49.2454, -123.0793),  # KENSINGTON-CEDAR COTTAGE (King Edward Ave E)
+        "17": (49.2200, -123.0299),  # KILLARNEY (62nd Ave E)
+        "18": (49.2174, -123.0611),  # VICTORIA-FRASERVIEW (Kent Avenue North E)
+        "19": (49.2479, -123.0454),  # RENFREW-COLLINGWOOD (Fleming St)
+        "20": (49.2174, -123.0611),  # SUNSET (Oxford St)
+        "21": (49.2791, -123.0490),  # HASTINGS-SUNRISE (1st Ave E)
+        "22": (49.2479, -123.0454),  # RENFREW-COLLINGWOOD (Rupert St)
+        "23": (49.2454, -123.0793),  # KENSINGTON-CEDAR COTTAGE (Vanness Ave)
+        "24": (49.2200, -123.0299),  # KILLARNEY (44th Ave E)
+        "25": (49.2408, -123.1175),  # SOUTH CAMBIE (Weaver Crt)
+        "26": (49.2827, -123.1207),  # DOWNTOWN (Smithe St)
+        "27": (49.2888, -123.1394),  # WEST END (Barclay St)
+        "28": (49.2888, -123.1394),  # WEST END (Bayshore Dr)
+        "29": (49.2827, -123.1207),  # DOWNTOWN (Helmcken St)
+        "30": (49.2827, -123.1207),  # DOWNTOWN (Howe St)
     }
-    
+        
     # Convert to a small Spark DataFrame
-    # This is tiny — 22 rows, no memory issues
-    from pyspark.sql.types import StructType, StructField, StringType
     
     schema = StructType([
         StructField("neighbourhood_code", StringType(), True),
@@ -173,6 +189,14 @@ def calculate_nearest_station(properties: DataFrame, stations: DataFrame) -> Dat
         on="neighbourhood_code",
         how="left",
     )
+
+    # After the join, log how many rows have null distance_km
+    null_count = enriched.filter(F.col("distance_km").isNull()).count()
+    if null_count > 0:
+        logger.warning(
+            "%s properties had no neighbourhood match — distance_km will be null",
+            f"{null_count:,}"
+        )
     
     logger.info("Enriched properties with nearest station per neighbourhood")
     return enriched

@@ -16,7 +16,7 @@ docker compose exec pipeline python -m transformation.transform_properties
 """
 
 import logging 
-import sys
+import os
 from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
@@ -28,11 +28,12 @@ from transformation.spark_session import create_spark_session
 logger = logging.getLogger(__name__)
 
 #----CONFIG----
-BRONZE_PATH: Path = (
-    Path(__file__).parent.parent.parent / "data" / "bronze" / "property_tax" / "property_tax_raw.parquet"
-)
 
-SILVER_PATH: Path = Path(__file__).parent.parent.parent / "data" / "silver" / "properties_cleaned"
+# If running in Airflow, use /opt/airflow/data; otherwise fallback to /app/data
+BASE_DATA_PATH = Path(os.environ.get("BASE_DATA_PATH", "/app/data"))
+
+BRONZE_PATH: Path = BASE_DATA_PATH / "bronze/property_tax/property_tax_raw.parquet"
+SILVER_PATH: Path = BASE_DATA_PATH / "silver/properties_cleaned"
 
 #----Transformation Functions----
 
@@ -49,6 +50,8 @@ def read_bronze(spark: SparkSession) -> DataFrame:
     logger.info("Reading bronze data from: %s", BRONZE_PATH)
 
     # read bronze parquet file into df
+    if not BRONZE_PATH.exists():
+        raise FileNotFoundError(f"Bronze file not found at {BRONZE_PATH}")
     df: DataFrame = spark.read.parquet(str(BRONZE_PATH))
     logger.info("Raw row count: %s | Columns: %d", f"{df.count():,}", len(df.columns))
 

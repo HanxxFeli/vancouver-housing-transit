@@ -1,0 +1,88 @@
+name: CI Pipeline
+
+# when to run this workflow 
+on: 
+  push: 
+    branches: [main, develop] # when code is pushed to these branches
+  pull_request:
+    branches: [main] # when a PR is opened targeting main
+
+# What to run
+jobs: 
+
+  # Job 1: Code Quality Check
+  lint-and-format: 
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download your code onto the runner machine
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      # Step 3: Install linting tools
+      - name: Install linting dependencies
+        run: |
+          pip install flake8 black isort
+      
+      # Step 4: Check code formatting with black
+      # black --check doesn't change files — it just returns an error if they'd change
+      - name: Check formatting (black)
+        run: black --check src/
+      
+      # Step 5: Check import ordering
+      - name: Check import ordering (isort)
+        run: isort --check-only src/
+      
+      # Step 6: Check for syntax errors and style issues
+      # --max-line-length=100 allows slightly longer lines than PEP8's default 79
+      - name: Lint (flake8)
+        run: flake8 src/ --max-line-length=100 --exclude=__pycache__
+
+  # Job 2: Run data quality tests
+  # Note: We skip ingestion tests in CI since we don't have API keys or large data there
+  test:
+    name: Data Quality Tests
+    runs-on: ubuntu-latest
+    
+    # This job only runs AFTER lint passes
+    # If linting fails, no point running tests
+    needs: lint-and-format
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      # Install Java for PySpark
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install pyspark==3.5.1 pandas pyarrow pytest python-dotenv requests
+      
+      # Create a fake .env so tests don't fail on missing env vars
+      - name: Create test environment file
+        run: |
+          echo "TRANSLINK_API_KEY=test_key_placeholder" > .env
+          echo "ENVIRONMENT=ci" >> .env
+      
+      # Run tests — pytest discovers files matching test_*.py automatically
+      - name: Run tests
+        run: pytest src/tests/ -v --tb=short
+        # -v = verbose (shows each test name)
+        # --tb=short = show short tracebacks on failure
