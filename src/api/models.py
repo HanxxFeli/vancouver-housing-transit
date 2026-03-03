@@ -12,6 +12,7 @@ Fast API will use them to:
 
 from pydantic import BaseModel
 
+
 class NeighbourhoodOverview(BaseModel):
     """
     Summary stats for a single Vancouver neighbourhood
@@ -21,38 +22,40 @@ class NeighbourhoodOverview(BaseModel):
     """
 
     neighbourhood_code: str
-    neighbourhood_name: str | None     # readable version "Kitsilano"
+    neighbourhood_name: str | None  # readable version "Kitsilano"
     total_properties: int
-    avg_land_value: float | None 
+    avg_land_value: float | None
     avg_distance_to_station_km: float | None
     pct_within_500m_station: float | None
     avg_yoy_change_pct: float | None
 
-    class Config: 
-        # allow the model to be created from pandas DF rows 
+    class Config:
+        # allow the model to be created from pandas DF rows
         from_attributes = True
+
 
 class TransitProximityDetail(BaseModel):
     """
     Property value breakdown by transit proximity for a neighbourhood
-    Returned by: 
+    Returned by:
     GET /api/neighbourhoods/{code}/transit-analysis
     """
 
     neighbourhood_code: str
     neighbourhood_name: str | None
-    transit_proximity_category: str             # e.g. "< 500m", "500m - 1km"
+    transit_proximity_category: str  # e.g. "< 500m", "500m - 1km"
     property_count: int
     avg_land_value: float | None
     median_land_value: float | None
     avg_distance_to_station_km: float | None
-    primary_station: str | None             # nearest SkyTrain station name
+    primary_station: str | None  # nearest SkyTrain station name
     avg_yoy_change_pct: float | None
+
 
 class PipelineHealth(BaseModel):
     """
     Healh check response - verifies the API is running and gold data is available
-    Returned by: 
+    Returned by:
     - GET /health
     """
 

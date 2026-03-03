@@ -15,7 +15,7 @@ Running:
 docker compose exec pipeline python -m transformation.transform_properties
 """
 
-import logging 
+import logging
 import os
 from pathlib import Path
 
@@ -27,7 +27,7 @@ from transformation.spark_session import create_spark_session
 
 logger = logging.getLogger(__name__)
 
-#----CONFIG----
+# ----CONFIG----
 
 # If running in Airflow, use /opt/airflow/data; otherwise fallback to /app/data
 BASE_DATA_PATH = Path(os.environ.get("BASE_DATA_PATH", "/app/data"))
@@ -35,9 +35,10 @@ BASE_DATA_PATH = Path(os.environ.get("BASE_DATA_PATH", "/app/data"))
 BRONZE_PATH: Path = BASE_DATA_PATH / "bronze/property_tax/property_tax_raw.parquet"
 SILVER_PATH: Path = BASE_DATA_PATH / "silver/properties_cleaned"
 
-#----Transformation Functions----
+# ----Transformation Functions----
 
-def read_bronze(spark: SparkSession) -> DataFrame: 
+
+def read_bronze(spark: SparkSession) -> DataFrame:
     """
     read the raw property tax parquet file into a Spark DataFrame
 
@@ -57,6 +58,7 @@ def read_bronze(spark: SparkSession) -> DataFrame:
 
     return df
 
+
 def clean_column_names(df: DataFrame) -> DataFrame:
     """
     Standardizes column names to snake_case
@@ -68,7 +70,7 @@ def clean_column_names(df: DataFrame) -> DataFrame:
         DataFrame: Same data but renamed column names
     """
 
-    rename_map: dict[str, str] = { 
+    rename_map: dict[str, str] = {
         "PID": "property_id",
         "LEGAL_TYPE": "legal_type",
         "FOLIO": "folio",
@@ -102,6 +104,7 @@ def clean_column_names(df: DataFrame) -> DataFrame:
 
     return df
 
+
 def cast_data_types(df: DataFrame) -> DataFrame:
     """
     Converts columns to their correct data types
@@ -133,12 +136,13 @@ def cast_data_types(df: DataFrame) -> DataFrame:
 
     return df
 
+
 def add_derived_columns(df: DataFrame) -> DataFrame:
     """
     Creates new columns calculated from existing data
 
     Args:
-        df (DataFrame): Cleaned df with correct types 
+        df (DataFrame): Cleaned df with correct types
 
     Returns:
         DataFrame: data with derived business metrics
@@ -156,27 +160,29 @@ def add_derived_columns(df: DataFrame) -> DataFrame:
         F.col("current_land_value") - F.col("previous_land_value"),
     )
 
-    # year over year change as percentage 
+    # year over year change as percentage
     df = df.withColumn(
         "land_value_change_pct",
         F.when(
-            F.col("previous_land_value").isNotNull() & (F.col("previous_land_value") > 0),
+            F.col("previous_land_value").isNotNull()
+            & (F.col("previous_land_value") > 0),
             F.col("land_value_change") / F.col("previous_land_value") * 100,
-        ).otherwise(None)
+        ).otherwise(None),
     )
 
-    # property age in years 
+    # property age in years
     df = df.withColumn(
         "property_age_years",
         F.when(
             F.col("year_built").isNotNull() & (F.col("year_built") > 1800),
             F.lit(2024) - F.col("year_built"),
-        ).otherwise(None)
+        ).otherwise(None),
     )
 
     return df
 
-def filter_and_clean(df: DataFrame) -> DataFrame: 
+
+def filter_and_clean(df: DataFrame) -> DataFrame:
     """
     removes unsuable rows and logs how many were dropped
 
@@ -187,7 +193,7 @@ def filter_and_clean(df: DataFrame) -> DataFrame:
         DataFrame: Filtered DF with only valid rows
     """
 
-    # get df initial row count 
+    # get df initial row count
     initial_count: int = df.count()
 
     df = df.filter(F.col("current_land_value").isNotNull())
@@ -207,19 +213,19 @@ def filter_and_clean(df: DataFrame) -> DataFrame:
     )
     return df
 
-def write_silver(df: DataFrame) -> None: 
+
+def write_silver(df: DataFrame) -> None:
     """
     Writes the cleaned df to the silver layer as a partitioned parquet
 
     Args:
-        df (DataFrame): final cleaned df 
+        df (DataFrame): final cleaned df
 
     Partition by neighbourhood_code
     """
 
     SILVER_PATH.mkdir(parents=True, exist_ok=True)
     logger.info("Writing silver data  to: %s", SILVER_PATH)
-
 
     (
         df.repartition(4)
@@ -229,6 +235,7 @@ def write_silver(df: DataFrame) -> None:
     )
 
     logger.info("Silver layer written successfully")
+
 
 def main() -> None:
     logging.basicConfig(
@@ -240,7 +247,7 @@ def main() -> None:
 
     logger.info("=== Property Tax Transformation ===")
 
-    # call all the functions 
+    # call all the functions
     df: DataFrame = (
         read_bronze(spark)
         .transform(clean_column_names)
@@ -251,8 +258,12 @@ def main() -> None:
 
     # show and verify important columns
     df.select(
-        "property_id", "street_name", "neighbourhood_code",
-        "current_land_value", "total_assessed_value", "year_built",
+        "property_id",
+        "street_name",
+        "neighbourhood_code",
+        "current_land_value",
+        "total_assessed_value",
+        "year_built",
     ).show(10, truncate=False)
 
     write_silver(df)

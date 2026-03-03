@@ -5,7 +5,6 @@ PURPOSE: The master orchestrator — runs every stage of the pipeline
          in the correct order, with structured logging and error handling.
 """
 
-
 import argparse
 import logging
 import sys
@@ -31,17 +30,20 @@ from transformation.transform_gold import main as transform_gold
 from transformation.transform_properties import main as transform_properties
 from transformation.transform_transit_proximity import main as transform_proximity
 
-def run_stage(stage_name: str, stage_func: Callable, skip_on_failure: bool = False) -> bool:
-    """"
+
+def run_stage(
+    stage_name: str, stage_func: Callable, skip_on_failure: bool = False
+) -> bool:
+    """ "
     Runs a single pipeline stage with timing and error handling
 
-    Args: 
-        stage_name: name of the process shown in logs 
-        stage_func: callable to execute 
+    Args:
+        stage_name: name of the process shown in logs
+        stage_func: callable to execute
         skip_on_failure: if True: continue the pipeline even if stage fails
                          if False (defaul), failure stops the entire pipeline
 
-    Returns: 
+    Returns:
         bool: True if the stage succeeded, False if it failed and was skipped.
     """
 
@@ -49,12 +51,12 @@ def run_stage(stage_name: str, stage_func: Callable, skip_on_failure: bool = Fal
     logger.info("Starting stage: %s", stage_name)
     start_time: float = time.time()
 
-    try: 
-        stage_func() # runs the function (ingestion, transformation)
+    try:
+        stage_func()  # runs the function (ingestion, transformation)
         elapsed: float = time.time() - start_time
         logger.info("Stage complete: %s (%.1fs)", stage_name, elapsed)
-        return True 
-    
+        return True
+
     except Exception as e:
         elapsed: float = time.time() - start_time
         logger.error("Stage FAILED: %s (%.1fs) — %s", stage_name, elapsed, e)
@@ -64,8 +66,9 @@ def run_stage(stage_name: str, stage_func: Callable, skip_on_failure: bool = Fal
             return False
         raise
 
-#----MAIN PIPELINE----
-def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None: 
+
+# ----MAIN PIPELINE----
+def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None:
     """
     Runs the full Bronze -> Silver -> Gold pipeline end to end.
 
@@ -87,7 +90,7 @@ def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None:
 
     results: dict[str, bool] = {}
 
-    #----Bronze Layer----
+    # ----Bronze Layer----
     # general ingestion using "ingest" but doesnt match dag file
     if "ingest" in stages_to_run and not skip_ingestion:
         results["ingest_property_tax"] = run_stage(
@@ -119,7 +122,7 @@ def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None:
                 "Bronze: Ingest TransLink GTFS Data", ingest_translink_stops
             )
 
-    #----Silver Layer----
+    # ----Silver Layer----
     if "transform" in stages_to_run:
         results["transform_properties"] = run_stage(
             "Silver: Transform Property Data", transform_properties
@@ -130,7 +133,7 @@ def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None:
     else:
         logger.info("Skipping transformations (not in stages list)")
 
-    #----Gold Layer----
+    # ----Gold Layer----
     if "gold" in stages_to_run:
         results["transform_gold"] = run_stage(
             "Gold: Build Neighbourhood Summaries", transform_gold
@@ -138,7 +141,7 @@ def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None:
     else:
         logger.info("Skipping gold layer (not in stages list)")
 
-    #----Summary----
+    # ----Summary----
     total_elapsed: float = time.time() - pipeline_start
     logger.info("=" * 50)
     logger.info("PIPELINE COMPLETE — total time: %.1fs", total_elapsed)
@@ -157,14 +160,15 @@ def run_pipeline(skip_ingestion: bool = False, stages: list = None) -> None:
     else:
         logger.info("All stages completed successfully")
 
+
 # ----ENTRY----
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Vancouver Housing-Transit Pipeline")
-    
+
     # Skip Ingestion Argument
     parser.add_argument(
-        "--skip-ingestion", # flag name
-        action="store_true", # if flag is present, set to True
+        "--skip-ingestion",  # flag name
+        action="store_true",  # if flag is present, set to True
         help="Skip data download and use existing bronze files",
     )
 
@@ -172,12 +176,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--stages",
         nargs="+",  # Accept one or more values
-        choices=["ingest", "ingest_properties", "ingest_translink", "transform", "gold"],  # Only allow these values
+        choices=[
+            "ingest",
+            "ingest_properties",
+            "ingest_translink",
+            "transform",
+            "gold",
+        ],  # Only allow these values
         help="Which stages to run: ingest, transform, gold (can specify multiple)",
     )
 
     args = parser.parse_args()
-    run_pipeline(
-        skip_ingestion=args.skip_ingestion,
-        stages=args.stages
-    )
+    run_pipeline(skip_ingestion=args.skip_ingestion, stages=args.stages)

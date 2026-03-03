@@ -24,12 +24,12 @@ from api.models import PipelineHealth
 
 logger = logging.getLogger(__name__)
 
-#----CONFIG----
+# ----CONFIG----
 # Same BASE_DATA_PATH pattern used throughout the pipeline
 BASE_DATA_PATH = Path(os.environ.get("BASE_DATA_PATH", "/app/data"))
 GOLD_PATH = BASE_DATA_PATH / "gold" / "neighbourhood_summary"
 
-#----APP SETUP----
+# ----APP SETUP----
 
 # title, desc, and version for /docs page
 app = FastAPI(
@@ -46,10 +46,10 @@ app = FastAPI(
 
         **Try the endpoints below** to explore neighbourhood stats.
     """,
-    version="1.0.0"
+    version="1.0.0",
 )
 
-#----CORS----
+# ----CORS----
 # allow all routes but change in production
 app.add_middleware(
     CORSMiddleware,
@@ -59,26 +59,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#----ROUTERS----
+# ----ROUTERS----
 # Register all the neighbourhoods router
 app.include_router(neighbourhoods.router)
 
-#----System Endpoints----
+# ----System Endpoints----
+
 
 @app.get("/health", response_model=PipelineHealth, tags=["System"])
 def health_check():
-    """ 
+    """
     Verfies the API is running and gold data is available
 
     Returns 'healthy' if gold parquet file exits, 'degraded' if not
     """
     overview_path = GOLD_PATH / "neighbourhood_overview"
-    parquet_files = list(overview_path.glob("*.parquet")) if overview_path.exists() else []
+    parquet_files = (
+        list(overview_path.glob("*.parquet")) if overview_path.exists() else []
+    )
     gold_available = len(parquet_files) > 0
 
     neighbourhood_count = None
-    if gold_available: 
-        try: 
+    if gold_available:
+        try:
             df = pd.read_parquet(parquet_files[0])
             neighbourhood_count = len(df)
         except Exception as e:
@@ -95,10 +98,11 @@ def health_check():
         ),
     )
 
+
 @app.get("/", tags=["System"])
 def root():
     """Root endpoint — points you to the right places."""
-    
+
     return {
         "message": "Vancouver Housing + Transit API",
         "docs": "/docs",
